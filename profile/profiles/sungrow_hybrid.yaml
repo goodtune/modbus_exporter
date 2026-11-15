@@ -1,0 +1,651 @@
+# Profile for Sungrow residential hybrid inverters (SH series) with a battery.
+#
+# Sources of the register map:
+# - mkaiser/Sungrow-SHx-Inverter-Modbus-Home-Assistant, file modbus_sungrow.yaml.
+#   It refers to the Sungrow document "Communication Protocol of Residential
+#   Hybrid Inverter".
+# - bohdan-s/SunGather, file registers-sungrow.yaml.
+#
+# All registers in this file were read from an SH15T with an SBR battery.
+# See README.md for the results of that test.
+
+name: sungrow_hybrid
+vendor: Sungrow
+description: Sungrow residential hybrid inverter (SH series) with a battery
+
+# The register numbers in this file are those of the Sungrow document.
+# The address on the wire is the register number minus 1.
+address_offset: -1
+
+# 32-bit values have the low word first.
+word_order: low_first
+
+# Register values that mean "no data".
+no_data:
+  u16: 0xFFFF
+  s16: 0x7FFF
+  u32: 0xFFFFFFFF
+  s32: 0x7FFFFFFF
+
+# Register 5000 is the device type code.
+model:
+  register: 5000
+  data_type: u16
+  map:
+    0x0D03: SH5K-V13
+    0x0D06: SH3K6
+    0x0D07: SH4K6
+    0x0D09: SH5K-20
+    0x0D0A: SH3K6-30
+    0x0D0B: SH4K6-30
+    0x0D0C: SH5K-30
+    0x0D0D: SH3.6RS
+    0x0D0F: SH5.0RS
+    0x0D10: SH6.0RS
+    0x0D17: SH3.0RS
+    0x0D18: SH4.0RS
+    0x0D1A: SH8.0RS
+    0x0D1B: SH10RS
+    0x0D27: MG5RL
+    0x0D28: MG6RL
+    0x0E00: SH5.0RT
+    0x0E01: SH6.0RT
+    0x0E02: SH8.0RT
+    0x0E03: SH10RT
+    0x0E08: SH5.0RT-V122
+    0x0E09: SH6.0RT-V122
+    0x0E0A: SH8.0RT-V122
+    0x0E0B: SH10RT-V122
+    0x0E0C: SH5.0RT-V112
+    0x0E0D: SH6.0RT-V112
+    0x0E0E: SH8.0RT-V112
+    0x0E0F: SH10RT-V112
+    0x0E10: SH5.0RT-20
+    0x0E11: SH6.0RT-20
+    0x0E12: SH8.0RT-20
+    0x0E13: SH10RT-20
+    0x0E20: SH5T
+    0x0E21: SH6T
+    0x0E22: SH8T
+    0x0E23: SH10T
+    0x0E24: SH12T
+    0x0E25: SH15T
+    0x0E26: SH20T
+    0x0E28: SH25T
+
+collectors:
+  - name: inverter
+    help: Firmware, state, temperature and AC output of the inverter.
+  - name: pv
+    help: PV power, and voltage and current of each MPPT.
+  - name: grid
+    help: Grid import and export power from the energy meter, frequency and voltage.
+  - name: load
+    help: Power that the house uses.
+  - name: battery
+    help: Battery power, state of charge, state of health, temperature, voltage and current.
+  - name: energy
+    help: Energy counters for today and for the lifetime of the system.
+
+# Each block is one read request. All are input registers (function 0x04).
+blocks:
+  - {name: inverter, start: 5000, count: 38} # 5000 to 5037
+  - {name: battery_power, start: 5214, count: 2}
+  - {name: frequency, start: 5242, count: 1}
+  - {name: meter, start: 5601, count: 8} # 5601 to 5608
+  - {name: battery, start: 5628, count: 12} # 5628 to 5639
+  - {name: hybrid, start: 13000, count: 48} # 13000 to 13047
+  - {name: firmware, start: 13250, count: 45} # 13250 to 13294
+
+metrics:
+  # Inverter
+
+  - name: inverter_rated_power_watts
+    help: Rated output power of the inverter in W.
+    collector: inverter
+    register: 5001
+    data_type: u16
+    scale: 100
+
+  - name: inverter_temperature_celsius
+    help: Temperature inside the inverter in °C.
+    collector: inverter
+    register: 5008
+    data_type: s16
+    scale: 0.1
+
+  - name: inverter_power_factor
+    help: Power factor of the inverter output, -1 to 1.
+    collector: inverter
+    register: 5035
+    data_type: s16
+    scale: 0.001
+
+  - name: inverter_active_power_watts
+    help: "AC active power of the inverter in W. Positive: the inverter supplies power. Negative: the inverter takes power, to charge the battery from the grid."
+    collector: inverter
+    register: 13034
+    data_type: s32
+
+  - name: inverter_phase_current_amperes
+    help: AC current of the inverter for each phase in A.
+    collector: inverter
+    register: 13031
+    data_type: s16
+    scale: 0.1
+    labels: {phase: a}
+
+  - name: inverter_phase_current_amperes
+    help: AC current of the inverter for each phase in A.
+    collector: inverter
+    register: 13032
+    data_type: s16
+    scale: 0.1
+    labels: {phase: b}
+
+  - name: inverter_phase_current_amperes
+    help: AC current of the inverter for each phase in A.
+    collector: inverter
+    register: 13033
+    data_type: s16
+    scale: 0.1
+    labels: {phase: c}
+
+  - name: inverter_running_state_code
+    help: Running state of the inverter as the code of the device protocol. See also modbus_inverter_running_state.
+    collector: inverter
+    register: 13000
+    data_type: u16
+
+  - name: inverter_running_state
+    help: Running state of the inverter by name. The series of the current state is 1.
+    collector: inverter
+    register: 13000
+    data_type: u16
+    value_label: state
+    map:
+      0x0000: Running
+      0x0001: Stop
+      0x0002: Key stop
+      0x0004: Emergency Stop
+      0x0008: Standby
+      0x0010: Initial standby
+      0x0014: Microgrid Operation
+      0x0020: Starting
+      0x0040: Running
+      0x0041: Off-grid Charge
+      0x0080: Derating Running
+      0x0100: Fault
+      0x0200: Update Failed
+      0x0400: Running in maintain mode
+      0x0800: Running in forced mode
+      0x1000: Running (off-grid)
+      0x1111: Uninitialized
+      0x1200: Initial standby
+      0x1300: Key stop
+      0x1400: Standby
+      0x1500: Emergency Stop
+      0x1600: Starting
+      0x1700: AFCI self-test shutdown
+      0x1800: Intelligent Station Building Status
+      0x1900: Safe Mode
+      0x2000: Open loop
+      0x2500: Communicate fault
+      0x2501: Restarting
+      0x4000: Running in External EMS mode
+      0x4001: Emergency Charging Operation
+      0x5500: Fault
+      0x8000: Stop
+      0x8100: Derating Running
+      0x8200: Dispatch Running
+      0x9100: Warn Running
+
+  # Register 13001 is the power flow status. Each bit is one flow.
+
+  - name: inverter_power_flow
+    help: Power flows that the inverter reports as active (1) or not active (0).
+    collector: inverter
+    register: 13001
+    data_type: u16
+    bitmask: 0x01
+    labels: {flow: pv_generating}
+
+  - name: inverter_power_flow
+    help: Power flows that the inverter reports as active (1) or not active (0).
+    collector: inverter
+    register: 13001
+    data_type: u16
+    bitmask: 0x02
+    labels: {flow: battery_charging}
+
+  - name: inverter_power_flow
+    help: Power flows that the inverter reports as active (1) or not active (0).
+    collector: inverter
+    register: 13001
+    data_type: u16
+    bitmask: 0x04
+    labels: {flow: battery_discharging}
+
+  - name: inverter_power_flow
+    help: Power flows that the inverter reports as active (1) or not active (0).
+    collector: inverter
+    register: 13001
+    data_type: u16
+    bitmask: 0x08
+    labels: {flow: load_active}
+
+  - name: inverter_power_flow
+    help: Power flows that the inverter reports as active (1) or not active (0).
+    collector: inverter
+    register: 13001
+    data_type: u16
+    bitmask: 0x10
+    labels: {flow: grid_exporting}
+
+  - name: inverter_power_flow
+    help: Power flows that the inverter reports as active (1) or not active (0).
+    collector: inverter
+    register: 13001
+    data_type: u16
+    bitmask: 0x20
+    labels: {flow: grid_importing}
+
+  # Firmware names are text of 15 registers. Serial numbers are not read.
+
+  - name: device_firmware_info
+    help: Firmware version of each component of the device. The value is always 1.
+    collector: inverter
+    register: 13250
+    data_type: string
+    count: 15
+    value_label: version
+    labels: {component: inverter}
+
+  - name: device_firmware_info
+    help: Firmware version of each component of the device. The value is always 1.
+    collector: inverter
+    register: 13265
+    data_type: string
+    count: 15
+    value_label: version
+    labels: {component: communication_module}
+
+  - name: device_firmware_info
+    help: Firmware version of each component of the device. The value is always 1.
+    collector: inverter
+    register: 13280
+    data_type: string
+    count: 15
+    value_label: version
+    labels: {component: battery}
+
+  # PV
+
+  - name: pv_power_watts
+    help: Total DC power of all PV inputs in W.
+    collector: pv
+    register: 5017
+    data_type: u32
+
+  - name: pv_mppt_voltage_volts
+    help: DC voltage of each MPPT input in V.
+    collector: pv
+    register: 5011
+    data_type: u16
+    scale: 0.1
+    labels: {mppt: "1"}
+
+  - name: pv_mppt_voltage_volts
+    help: DC voltage of each MPPT input in V.
+    collector: pv
+    register: 5013
+    data_type: u16
+    scale: 0.1
+    labels: {mppt: "2"}
+
+  - name: pv_mppt_voltage_volts
+    help: DC voltage of each MPPT input in V.
+    collector: pv
+    register: 5015
+    data_type: u16
+    scale: 0.1
+    labels: {mppt: "3"}
+
+  - name: pv_mppt_current_amperes
+    help: DC current of each MPPT input in A.
+    collector: pv
+    register: 5012
+    data_type: u16
+    scale: 0.1
+    labels: {mppt: "1"}
+
+  - name: pv_mppt_current_amperes
+    help: DC current of each MPPT input in A.
+    collector: pv
+    register: 5014
+    data_type: u16
+    scale: 0.1
+    labels: {mppt: "2"}
+
+  - name: pv_mppt_current_amperes
+    help: DC current of each MPPT input in A.
+    collector: pv
+    register: 5016
+    data_type: u16
+    scale: 0.1
+    labels: {mppt: "3"}
+
+  - name: pv_mppt_power_watts
+    help: DC power of each MPPT input in W. The exporter calculates it as voltage times current, so its resolution is low.
+    collector: pv
+    register: 5011
+    data_type: u16
+    scale: 0.1
+    multiply: {register: 5012, data_type: u16, scale: 0.1}
+    labels: {mppt: "1"}
+
+  - name: pv_mppt_power_watts
+    help: DC power of each MPPT input in W. The exporter calculates it as voltage times current, so its resolution is low.
+    collector: pv
+    register: 5013
+    data_type: u16
+    scale: 0.1
+    multiply: {register: 5014, data_type: u16, scale: 0.1}
+    labels: {mppt: "2"}
+
+  - name: pv_mppt_power_watts
+    help: DC power of each MPPT input in W. The exporter calculates it as voltage times current, so its resolution is low.
+    collector: pv
+    register: 5015
+    data_type: u16
+    scale: 0.1
+    multiply: {register: 5016, data_type: u16, scale: 0.1}
+    labels: {mppt: "3"}
+
+  # Grid
+
+  - name: grid_power_watts
+    help: "Active power at the energy meter in W. Positive: import from the grid. Negative: export to the grid."
+    collector: grid
+    register: 5601
+    data_type: s32
+
+  - name: grid_import_power_watts
+    help: Power that is imported from the grid in W. It is 0 during export.
+    collector: grid
+    register: 5601
+    data_type: s32
+    part: positive
+
+  - name: grid_export_power_watts
+    help: Power that is exported to the grid in W. It is 0 during import.
+    collector: grid
+    register: 5601
+    data_type: s32
+    part: negative
+
+  - name: grid_inverter_export_power_watts
+    help: "Power to the grid as the inverter calculates it in W. Positive: export. Negative: import. The sign is opposite to modbus_grid_power_watts."
+    collector: grid
+    register: 13010
+    data_type: s32
+
+  - name: grid_frequency_hertz
+    help: Grid frequency in Hz.
+    collector: grid
+    register: 5242
+    data_type: u16
+    scale: 0.01
+
+  - name: grid_phase_power_watts
+    help: "Active power at the energy meter for each phase in W. Positive: import. Negative: export."
+    collector: grid
+    register: 5603
+    data_type: s32
+    labels: {phase: a}
+
+  - name: grid_phase_power_watts
+    help: "Active power at the energy meter for each phase in W. Positive: import. Negative: export."
+    collector: grid
+    register: 5605
+    data_type: s32
+    labels: {phase: b}
+
+  - name: grid_phase_power_watts
+    help: "Active power at the energy meter for each phase in W. Positive: import. Negative: export."
+    collector: grid
+    register: 5607
+    data_type: s32
+    labels: {phase: c}
+
+  - name: grid_voltage_volts
+    help: Grid voltage that the inverter measures for each phase in V.
+    collector: grid
+    register: 5019
+    data_type: u16
+    scale: 0.1
+    labels: {phase: a}
+
+  - name: grid_voltage_volts
+    help: Grid voltage that the inverter measures for each phase in V.
+    collector: grid
+    register: 5020
+    data_type: u16
+    scale: 0.1
+    labels: {phase: b}
+
+  - name: grid_voltage_volts
+    help: Grid voltage that the inverter measures for each phase in V.
+    collector: grid
+    register: 5021
+    data_type: u16
+    scale: 0.1
+    labels: {phase: c}
+
+  # Load
+
+  - name: load_power_watts
+    help: Power that the house uses in W. The inverter calculates it from its output and the energy meter.
+    collector: load
+    register: 13008
+    data_type: s32
+
+  # Battery
+
+  - name: battery_power_watts
+    help: "Battery power in W. Positive: the battery discharges. Negative: the battery charges."
+    collector: battery
+    register: 5214
+    data_type: s32
+
+  - name: battery_discharge_power_watts
+    help: Power that the battery supplies in W. It is 0 during charge.
+    collector: battery
+    register: 5214
+    data_type: s32
+    part: positive
+
+  - name: battery_charge_power_watts
+    help: Power that charges the battery in W. It is 0 during discharge.
+    collector: battery
+    register: 5214
+    data_type: s32
+    part: negative
+
+  - name: battery_current_amperes
+    help: "Battery current in A. Positive: the battery discharges. Negative: the battery charges."
+    collector: battery
+    register: 5631
+    data_type: s16
+    scale: 0.1
+
+  - name: battery_max_charge_current_amperes
+    help: Largest charge current that the battery management system permits in A.
+    collector: battery
+    register: 5635
+    data_type: u16
+
+  - name: battery_max_discharge_current_amperes
+    help: Largest discharge current that the battery management system permits in A.
+    collector: battery
+    register: 5636
+    data_type: u16
+
+  - name: battery_capacity_watt_hours
+    help: Rated capacity of the battery in Wh.
+    collector: battery
+    register: 5639
+    data_type: u16
+    scale: 10
+
+  - name: battery_voltage_volts
+    help: Battery voltage in V.
+    collector: battery
+    register: 13020
+    data_type: u16
+    scale: 0.1
+
+  - name: battery_state_of_charge_ratio
+    help: State of charge of the battery, 0 to 1.
+    collector: battery
+    register: 13023
+    data_type: u16
+    scale: 0.001
+
+  - name: battery_state_of_health_ratio
+    help: State of health of the battery, 0 to 1.
+    collector: battery
+    register: 13024
+    data_type: u16
+    scale: 0.001
+
+  - name: battery_temperature_celsius
+    help: Battery temperature in °C.
+    collector: battery
+    register: 13025
+    data_type: s16
+    scale: 0.1
+
+  # Energy counters. Each quantity has a counter for today (16 bits) and a
+  # lifetime counter (32 bits) directly after it. The register unit of all is
+  # 0.1 kWh, so the scale is 100.
+
+  - name: pv_energy_today_watt_hours
+    help: "Energy that the PV inputs made today in Wh. The inverter sets it to 0 at midnight of its clock. Resolution: 100 Wh."
+    collector: energy
+    register: 13002
+    data_type: u16
+    scale: 100
+
+  - name: pv_energy_watt_hours_total
+    help: "Energy that the PV inputs made during the lifetime of the system in Wh. Resolution: 100 Wh."
+    type: counter
+    collector: energy
+    register: 13003
+    data_type: u32
+    scale: 100
+
+  - name: pv_export_energy_today_watt_hours
+    help: "PV energy that was exported to the grid today in Wh. The inverter sets it to 0 at midnight of its clock. Resolution: 100 Wh."
+    collector: energy
+    register: 13005
+    data_type: u16
+    scale: 100
+
+  - name: pv_export_energy_watt_hours_total
+    help: "PV energy that was exported to the grid during the lifetime of the system in Wh. Resolution: 100 Wh."
+    type: counter
+    collector: energy
+    register: 13006
+    data_type: u32
+    scale: 100
+
+  - name: battery_charge_from_pv_energy_today_watt_hours
+    help: "PV energy that charged the battery today in Wh. The inverter sets it to 0 at midnight of its clock. Resolution: 100 Wh."
+    collector: energy
+    register: 13012
+    data_type: u16
+    scale: 100
+
+  - name: battery_charge_from_pv_energy_watt_hours_total
+    help: "PV energy that charged the battery during the lifetime of the system in Wh. Resolution: 100 Wh."
+    type: counter
+    collector: energy
+    register: 13013
+    data_type: u32
+    scale: 100
+
+  - name: pv_direct_consumption_energy_today_watt_hours
+    help: "PV energy that the house used directly today in Wh. The inverter sets it to 0 at midnight of its clock. Resolution: 100 Wh."
+    collector: energy
+    register: 13017
+    data_type: u16
+    scale: 100
+
+  - name: pv_direct_consumption_energy_watt_hours_total
+    help: "PV energy that the house used directly during the lifetime of the system in Wh. Resolution: 100 Wh."
+    type: counter
+    collector: energy
+    register: 13018
+    data_type: u32
+    scale: 100
+
+  - name: battery_discharge_energy_today_watt_hours
+    help: "Energy that the battery supplied today in Wh. The inverter sets it to 0 at midnight of its clock. Resolution: 100 Wh."
+    collector: energy
+    register: 13026
+    data_type: u16
+    scale: 100
+
+  - name: battery_discharge_energy_watt_hours_total
+    help: "Energy that the battery supplied during the lifetime of the system in Wh. Resolution: 100 Wh."
+    type: counter
+    collector: energy
+    register: 13027
+    data_type: u32
+    scale: 100
+
+  - name: grid_import_energy_today_watt_hours
+    help: "Energy that was imported from the grid today in Wh. The inverter sets it to 0 at midnight of its clock. Resolution: 100 Wh."
+    collector: energy
+    register: 13036
+    data_type: u16
+    scale: 100
+
+  - name: grid_import_energy_watt_hours_total
+    help: "Energy that was imported from the grid during the lifetime of the system in Wh. Resolution: 100 Wh."
+    type: counter
+    collector: energy
+    register: 13037
+    data_type: u32
+    scale: 100
+
+  - name: battery_charge_energy_today_watt_hours
+    help: "Energy that charged the battery, from PV and from the grid, today in Wh. The inverter sets it to 0 at midnight of its clock. Resolution: 100 Wh."
+    collector: energy
+    register: 13040
+    data_type: u16
+    scale: 100
+
+  - name: battery_charge_energy_watt_hours_total
+    help: "Energy that charged the battery, from PV and from the grid, during the lifetime of the system in Wh. Resolution: 100 Wh."
+    type: counter
+    collector: energy
+    register: 13041
+    data_type: u32
+    scale: 100
+
+  - name: grid_export_energy_today_watt_hours
+    help: "Energy that was exported to the grid today in Wh. The inverter sets it to 0 at midnight of its clock. Resolution: 100 Wh."
+    collector: energy
+    register: 13045
+    data_type: u16
+    scale: 100
+
+  - name: grid_export_energy_watt_hours_total
+    help: "Energy that was exported to the grid during the lifetime of the system in Wh. Resolution: 100 Wh."
+    type: counter
+    collector: energy
+    register: 13046
+    data_type: u32
+    scale: 100

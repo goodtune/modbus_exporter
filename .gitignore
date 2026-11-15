@@ -1,0 +1,7 @@
+/modbus_exporter
+/.build/
+/.tarballs/
+/dist/
+*.test
+*.out
+/modbus_probe

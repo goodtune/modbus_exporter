@@ -1,0 +1,7 @@
+FROM gcr.io/distroless/static-debian12:nonroot
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/modbus_exporter /modbus_exporter
+EXPOSE 10063
+# Give the device with --modbus.address and --modbus.profile, or mount a
+# configuration file and give it with --config.file.
+ENTRYPOINT ["/modbus_exporter"]

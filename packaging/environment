@@ -1,0 +1,6 @@
+# Environment of modbus_exporter.service.
+
+# Flags for the exporter. Run "modbus_exporter --help" to see them.
+# The unit sets --config.file=/etc/modbus_exporter/config.yml.
+# Example: MODBUS_EXPORTER_ARGS=--modbus.poll-interval=30s
+MODBUS_EXPORTER_ARGS=

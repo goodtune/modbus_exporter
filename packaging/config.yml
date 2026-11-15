@@ -1,0 +1,19 @@
+# Devices that modbus_exporter polls.
+#
+# The exporter does not start while this list is empty. Add your devices,
+# then start the service:
+#   systemctl enable --now modbus_exporter.service
+#
+# Example:
+#
+# devices:
+#   - name: inverter
+#     address: 192.0.2.10:502
+#     unit_id: 1
+#     profile: sungrow_hybrid
+#
+# "profile" is an embedded profile or the path of a profile file. A relative
+# path starts at the directory of this file. For all settings, see
+# https://github.com/goodtune/modbus_exporter#configuration-file
+
+devices: []

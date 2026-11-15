@@ -1,0 +1,28 @@
+# Example configuration for modbus_exporter.
+#
+# Each device has its own poll. One exporter can poll many devices.
+
+devices:
+  # The value of the "device" label of all metrics of this device.
+  - name: inverter
+    # Address of the device or of its Modbus TCP gateway.
+    address: 192.0.2.10:502
+    # Modbus unit id. The default is 1.
+    unit_id: 1
+    # An embedded profile, or the path of a profile file. A relative path
+    # starts at the directory of this file.
+    profile: sungrow_hybrid
+
+  # A second device, with all the settings that a device can have.
+  - name: garage
+    address: 192.0.2.11:502
+    unit_id: 1
+    profile: sungrow_hybrid
+    # Shortest time between two polls. Not less than 5s.
+    poll_interval: 30s
+    # Timeout of one Modbus request.
+    timeout: 5s
+    # Pause between two requests of one poll.
+    request_pause: 200ms
+    # Collectors of the profile to enable. Without this list, all are enabled.
+    collectors: [grid, battery, energy]

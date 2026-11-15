@@ -1,0 +1,98 @@
+version: 2
+
+builds:
+  - id: modbus_exporter
+    main: .
+    binary: modbus_exporter
+    env:
+      - CGO_ENABLED=0
+    # The version variables are those of prometheus/common/version. They
+    # fill modbus_exporter_build_info and the output of --version.
+    ldflags:
+      - -s -w
+      - -X github.com/prometheus/common/version.Version={{.Version}}
+      - -X github.com/prometheus/common/version.Revision={{.FullCommit}}
+      - -X github.com/prometheus/common/version.Branch={{.Branch}}
+      - -X github.com/prometheus/common/version.BuildUser=goreleaser
+      - -X github.com/prometheus/common/version.BuildDate={{.Date}}
+    targets:
+      - linux_amd64
+      - linux_arm64
+      - darwin_amd64
+      - darwin_arm64
+
+  # The register dump tool. It is in the archives only.
+  - id: modbus_probe
+    main: ./cmd/modbus_probe
+    binary: modbus_probe
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    targets:
+      - linux_amd64
+      - linux_arm64
+      - darwin_amd64
+      - darwin_arm64
+
+archives:
+  - formats:
+      - tar.gz
+    files:
+      - README.md
+      - LICENSE
+      - examples/config.yml
+
+nfpms:
+  - id: modbus_exporter
+    package_name: modbus-exporter
+    ids:
+      - modbus_exporter
+    vendor: goodtune
+    homepage: https://github.com/goodtune/modbus_exporter
+    maintainer: goodtune <goodtune@users.noreply.github.com>
+    description: Prometheus exporter for Modbus TCP devices, with device profiles as data files
+    license: MIT
+    formats:
+      - rpm
+      - deb
+      - apk
+    bindir: /usr/bin
+    contents:
+      - src: packaging/systemd/modbus_exporter.service
+        dst: /usr/lib/systemd/system/modbus_exporter.service
+        type: config
+      - src: packaging/environment
+        dst: /etc/modbus_exporter/environment
+        type: config|noreplace
+      # The list of devices. The file as installed has no devices.
+      - src: packaging/config.yml
+        dst: /etc/modbus_exporter/config.yml
+        type: config|noreplace
+    scripts:
+      postinstall: packaging/scripts/postinstall.sh
+      preremove: packaging/scripts/preremove.sh
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+dockers_v2:
+  - ids:
+      - modbus_exporter
+    images:
+      - "ghcr.io/goodtune/modbus_exporter"
+    tags:
+      - "{{ .Tag }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    dockerfile: Dockerfile.goreleaser
